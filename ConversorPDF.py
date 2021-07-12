@@ -14,6 +14,15 @@ from fpdf import FPDF
 from PIL import Image
 from PyPDF2 import PdfFileMerger
 
+# Declaración de Variables 
+# ____ Almacenará las caracteristicas que deberá tener la vantana y subventanas
+Vent = []
+
+# ____ Almacenará las rutas de los archivos a procesar (imagenes o pdfs)
+Archs = []
+
+global NumArchvs 
+NumArchvs = 20
 
 # Función "Almc" - Será mostrada un ventana emergente en la cual deberá indicar la ruta en la cual deberá ser almacenado el archivo PDF
 def Almc():
@@ -62,6 +71,9 @@ def AlmacenarPDF():
 
 # Función "CovertPDF" - Realizará la conversión de las Imágenes proporcionadas a un archivo PDF ó la fusión de otros archivos PDF
 def ConvertPDF():
+    # ____ Bandera de error de lectura...
+    Error = False
+    
     if Archs[0] != 0:
         NombArch = Nomb.get()
         RutaDestino = Ruta.get()
@@ -78,71 +90,70 @@ def ConvertPDF():
 
             # Extración de las imagenes de la rutas previamente obtenidas
             for i in range(Archs[0]):
-                Imgs.append(Image.open(Archs[i+1]))
-
-                '''
-                # Conversión de imágenes PNG a JPG
-                path, nomb = os.path.split(Archs[i+1])
-                TipoImg = nomb[nomb.find('.'):len(nomb)]
-
-                if TipoImg == '.jpg':
-                    # Extración de las imagenes
-                    print(' -- Extrayendo imagen de: '+Archs[i+1])
+                try:
                     Imgs.append(Image.open(Archs[i+1]))
-                else:
-                    # Extración de las imagenes
-                    print(' -- Extrayendo imagen de: '+Archs[i+1])
-                    img = Image.open(Archs[i+1])
-                    print(' -- Conviertiendo a JPG')
-                    img.convert('RGB')
-                    Imgs.append(img)
-                '''
-            # _________________________ Creación del archivo PDF
-            pdf = FPDF('P','mm','A4')
+                except:
+                    Error = True
+                    #Info.configure(text = ' Ha sido movido de ubicación: '+Archs[i+1])
+                    break
 
-            for i in range(Archs[0]):
-                # Extracción de ancho y largo de la Imagen "i"
-                w, h = Imgs[i].size
-                
-                if w < h:
-                    #Vertical
-                    pdf.add_page('P')
-                    pdf.image(Archs[i+1],0,0,210,297)
-                else:
-                    #Horizontal
-                    pdf.add_page('L')
-                    pdf.image(Archs[i+1],0,0,297,210)
+            if not Error:
+                # _________________________ Creación del archivo PDF
+                pdf = FPDF('P','mm','A4')
 
-                Info.configure(text = ' Hoja '+str(i)+' de '+str(Archs[0]))
+                for i in range(Archs[0]):
+                    # Extracción de ancho y largo de la Imagen "i"
+                    w, h = Imgs[i].size
+                    
+                    if w < h:
+                        #Vertical
+                        pdf.add_page('P')
+                        pdf.image(Archs[i+1],0,0,210,297)
+                    else:
+                        #Horizontal
+                        pdf.add_page('L')
+                        pdf.image(Archs[i+1],0,0,297,210)
 
-            pdf.output(RutaDestino+'/'+NombArch+".pdf", "F")
+                    #Info.configure(text = ' Hoja '+str(i)+' de '+str(Archs[0]))
+
+                pdf.output(RutaDestino+'/'+NombArch+'.pdf', 'F')
+
         else:
             # --- PDFs a PDF
-
-            NombArchSalida = RutaDestino+'/'+NombArch+'.pdf'
             fusionador = PdfFileMerger()
 
             for i in range(Archs[0]):
-                fusionador.append(open(Archs[i+1], 'rb'))
+                try:
+                    fusionador.append(open(Archs[i+1], 'rb'))
+                except:
+                    Error = True
+                    break
             
-            fusionador.write(open(NombArchSalida, 'wb'))
-                        
-        Info.configure(text = ' ¡Listo! Su archivo PDF: '+NombArch+' se encuentra en '+RutaDestino)
+            if not Error:
+                NombArchSalida = RutaDestino+'/'+NombArch+'.pdf'
+                fusionador.write(open(NombArchSalida, 'wb'))
+        
+        if Error:
+            messagebox.showerror('Error en la extracción de archivos', ' Un archivo a sido elimnado o movido de su anterior ubicación...')
+        else:
+            Info.configure(text = ' ¡Listo! Su archivo PDF: '+NombArch+' se encuentra en '+RutaDestino)
 
 # ____________________________________________________________________________ Acciones en la tabla
 # Función "VaciarTabl" - Elimina todos los items de la tabla...
 def VaciarTabl():
+    global NumArchvs
+
     Archs.clear()
     Archs.append(0)
     
     Tabla.delete(*Tabla.get_children())
 
     if Vent[13] == 1:
-        NumImgs.configure(text = ' Puedes ingresar un máximo de 50 imágenes...')
+        NumImgs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs)+' imágenes...')
         ElimImg.configure(state=tk.DISABLED, cursor = 'arrow')
         SubirImgs.configure(state=tk.NORMAL, cursor = 'hand2')
     else:
-        NumArchs.configure(text = ' Puedes ingresar un máximo de 50 archivos...')
+        NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs)+' archivos...')
         ElimArch.configure(state=tk.DISABLED, cursor = 'arrow')
         SubirArchs.configure(state=tk.NORMAL, cursor = 'hand2')
 
@@ -195,6 +206,8 @@ def MovAbj():
 
 # Función "ElimElmt" - Elimina el item seleccionado de la tabla y posteriormente actualiza la información de la tabla...
 def ElimElmt():
+    global NumArchvs
+
     # Obteniendo ID del elemnto de la tabla seleccionado
     Elemt = Tabla.focus()
 
@@ -208,18 +221,39 @@ def ElimElmt():
             Tabla.insert(parent = '', index=(i+1), iid=(i+1), values=((i+1),nomb,path))
                 
         if Archs[0] == 0:
+            #Elimando todos los elementos
             if Vent[13] == 1:
-                NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(50 - Archs[0])+' archivos...')
+                NumImgs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs)+' imágenes...')
                 SubirImgs.configure(state=tk.NORMAL, cursor = 'hand2')
                 ElimImg.configure(state=tk.DISABLED, cursor = 'arrow')
             else:
-                NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(50 - Archs[0])+' archivos...')
+                NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs)+' archivos...')
                 SubirArchs.configure(state=tk.NORMAL, cursor = 'hand2')
                 ElimArch.configure(state=tk.DISABLED, cursor = 'arrow')
-
-            MovArriba.configure(state=tk.DISABLED, cursor = 'arrow')
-            MovAbajo.configure(state=tk.DISABLED, cursor = 'arrow')
+            
+            VaciarTbl.configure(state=tk.DISABLED, cursor = 'arrow')
             Convert.configure(state=tk.DISABLED, cursor = 'arrow')
+            MovArriba.configure(state=tk.DISABLED, cursor = 'hand2')
+            MovAbajo.configure(state=tk.DISABLED, cursor = 'hand2')
+
+        elif Archs[0] == NumArchvs-1:
+            # Solo ha eliminado uno del maximo a ingresar
+            if Vent[13] == 1:
+                NumImgs.configure(text = ' Puedes ingresar 1 imagen más...')
+                SubirImgs.configure(state=tk.NORMAL, cursor = 'hand2')
+            else:
+                NumArchs.configure(text = ' Puedes ingresar 1 archivo más...')
+                SubirArchs.configure(state=tk.NORMAL, cursor = 'hand2')
+        else:
+            # Ha eliminado uno
+            if Vent[13] == 1:
+                NumImgs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs - Archs[0])+' imágenes...')
+            else:
+                NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs - Archs[0])+' archivos...')
+
+            if Archs[0] == 1:
+                MovArriba.configure(state=tk.DISABLED, cursor = 'arrow')
+                MovAbajo.configure(state=tk.DISABLED, cursor = 'arrow')
 
 # ____________________________________________________________________________ Conversión de Imgs a PDF
 # Función "Imgs_PDF" - Dezpliega en la pantalla la ventana encargada del control de las imagenes a convertir
@@ -231,7 +265,7 @@ def Imgs_PDF():
     Archs.clear()
     Archs.append(0)
 
-    global SubVent, NumImgs, Info, Tabla, VaciarTbl, ElimImg, MovArriba, MovAbajo, Convert, SubirImgs
+    global SubVent, NumArchvs, NumImgs, Info, Tabla, VaciarTbl, ElimImg, MovArriba, MovAbajo, Convert, SubirImgs
     
     color_fondo = '#ffdfb5'
     color_text = 'white'
@@ -271,7 +305,7 @@ def Imgs_PDF():
     Tabla.heading(2, text = 'Nombre de la imagen (.formato)')
     Tabla.heading(3, text = 'Ubicación del archivo')
     
-    NumImgs = tk.Label(SubMenu, justify = 'left', text = ' Puede ingresar un máximo de 50 imágenes... ', bg = color_fondo, fg = '#902626', font = ('Arial',Vent[6],'bold italic'))
+    NumImgs = tk.Label(SubMenu, justify = 'left', text = ' Puede ingresar un máximo de '+str(NumArchvs)+' imágenes... ', bg = color_fondo, fg = '#902626', font = ('Arial',Vent[6],'bold italic'))
     
     CtrlInfoTbl = tk.LabelFrame(SubVent, relief = 'groove', bd = 7, text = ' - Movimientos a la información en la tabla - ', bg = color_fondo, fg = '#902626', font = ('Microsoft YaHei UI',Vent[6],'bold'))
     CtrlInfoTbl.grid_columnconfigure(0, weight = 1, uniform = 'fig')
@@ -306,33 +340,37 @@ def Imgs_PDF():
 
 # Función "SeleccImgs" - Selección de la imágenes a convertir
 def SeleccImgs():
-    if Archs[0] < 50:
+    global NumArchvs
+
+    if Archs[0] < NumArchvs:
         Imgs = filedialog.askopenfilenames(title = "Elige tu(s) archivo(s): ", filetypes = (('Imágenes JNG', '*.jpg'),('Imágenes PNG', '*.png')))
         if Imgs:
             i = Archs[0]
-            if i != 50:
+            if i != NumArchvs:
                 for Img in Imgs:
                     Archs.append(Img)
                     i += 1
                     path,nomb = os.path.split(Img)
                     Tabla.insert(parent = '', index=i, iid=i, values=(i,nomb,path))
                     
-                    if i == 50:
+                    if i == NumArchvs:
                         break
 
                 Archs[0] = i;
 
-                if i != 50:
-                    NumImgs.configure(text = ' Puedes ingresar un máximo de '+str(50 - Archs[0])+' imágenes...')
+                if i != NumArchvs:
+                    NumImgs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs - Archs[0])+' imágenes...')
                 else:
                     SubirImgs.configure(state=tk.DISABLED, cursor = 'arrow')
                     NumImgs.configure(text = ' Ya no es posible ingresar más imágenes...')
 
                 VaciarTbl.configure(state=tk.NORMAL, cursor = 'hand2')
                 ElimImg.configure(state=tk.NORMAL, cursor = 'hand2')
-                MovArriba.configure(state=tk.NORMAL, cursor = 'hand2')
-                MovAbajo.configure(state=tk.NORMAL, cursor = 'hand2')
                 Convert.configure(state=tk.NORMAL, cursor = 'hand2')
+
+                if i > 1:
+                    MovArriba.configure(state=tk.NORMAL, cursor = 'hand2')
+                    MovAbajo.configure(state=tk.NORMAL, cursor = 'hand2')
             else:
                 SubirImgs.configure(state=tk.DISABLED, cursor = 'arrow')
                 NumImgs.configure(text = ' Ya no es posible ingresar más imágenes...')
@@ -347,7 +385,7 @@ def PDFs_PDF():
     Archs.clear()
     Archs.append(0)
 
-    global SubVent, NumArchs, Info, Tabla, VaciarTbl, ElimArch, MovArriba, MovAbajo, Convert, SubirArchs
+    global SubVent, NumArchvs, NumArchs, Info, Tabla, VaciarTbl, ElimArch, MovArriba, MovAbajo, Convert, SubirArchs
     
     color_fondo = '#ffffd2'
     color_text = 'white'
@@ -387,7 +425,7 @@ def PDFs_PDF():
     Tabla.heading(2, text = 'Nombre del archivo (.pdf)')
     Tabla.heading(3, text = 'Ubicación del archivo')
     
-    NumArchs = tk.Label(SubMenu, justify = 'left', text = ' Puede ingresar un máximo de 50 archivos... ', bg = color_fondo, fg = '#00104d', font = ('Arial',Vent[6],'bold italic'))
+    NumArchs = tk.Label(SubMenu, justify = 'left', text = ' Puede ingresar un máximo de '+str(NumArchvs)+' archivos... ', bg = color_fondo, fg = '#00104d', font = ('Arial',Vent[6],'bold italic'))
     
     CtrlInfoTbl = tk.LabelFrame(SubVent, relief = 'groove', bd = 7, text = ' - Movimientos a la información en la tabla - ', bg = color_fondo, fg = '#00104d', font = ('Microsoft YaHei UI',Vent[6],'bold'))
     CtrlInfoTbl.grid_columnconfigure(0, weight = 1, uniform = 'fig')
@@ -422,46 +460,43 @@ def PDFs_PDF():
 
 # Función "SeleccArch" - Selección de los archivos PDF a convertir
 def SeleccArch():
-    if Archs[0] < 50:
+    global NumArchvs
+
+    if Archs[0] < NumArchvs:
         Archvs = filedialog.askopenfilenames(title = "Elige tu(s) archivo(s): ", filetypes = (('Archivos PDF', '*.pdf'),))
         if Archvs:
             i = Archs[0]
-            if i != 50:
+            if i != NumArchvs:
                 for A in Archvs:
                     Archs.append(A)
                     i += 1
                     path,nomb = os.path.split(A)
                     Tabla.insert(parent = '', index=i, iid=i, values=(i,nomb,path))
                     
-                    if i == 50:
+                    if i == NumArchvs:
                         break
 
                 Archs[0] = i;
 
-                if i != 50:
-                    NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(50 - Archs[0])+' archivos...')
+                if i != NumArchvs:
+                    NumArchs.configure(text = ' Puedes ingresar un máximo de '+str(NumArchvs - Archs[0])+' archivos...')
                 else:
                     SubirArchs.configure(state=tk.DISABLED, cursor = 'arrow')
                     NumArchs.configure(text = ' Ya no es posible ingresar más archivos...')
 
                 VaciarTbl.configure(state=tk.NORMAL, cursor = 'hand2')
                 ElimArch.configure(state=tk.NORMAL, cursor = 'hand2')
-                MovArriba.configure(state=tk.NORMAL, cursor = 'hand2')
-                MovAbajo.configure(state=tk.NORMAL, cursor = 'hand2')
                 Convert.configure(state=tk.NORMAL, cursor = 'hand2')
+                if i > 1:
+                    MovArriba.configure(state=tk.NORMAL, cursor = 'hand2')
+                    MovAbajo.configure(state=tk.NORMAL, cursor = 'hand2')
             else:
                 SubirArchs.configure(state=tk.DISABLED, cursor = 'arrow')
                 NumArchs.configure(text = ' Ya no es posible ingresar más archivos...')
 
-# ____ Almacenará las caracteristicas que deberá tener la vantana y subventanas
-Vent = []
-
-# ____ Almacenará las rutas de los archivos a procesar (imagenes o pdfs)
-Archs = []
-
 # ____________________ DETERMINANDO ESTETICA DE VENTANA PRINCIPAL _____________________
 # Identificando sistema operativo...
-if platform == "linux" or platform == "linux2":
+if platform == 'linux' or platform == 'linux2':
     # Sistema: Linux...
     # Dimensión de la pantalla
     args = ["xrandr", "-q", "-d", ":0"]
@@ -475,10 +510,10 @@ if platform == "linux" or platform == "linux2":
                 Vent.append(int(line.split()[9][:-1]))
 
     #print(os.path.join(os.path.join(os.path.expanduser('~')), 'Desktop'))
-elif platform == "darwin":
+elif platform == 'darwin':
     # Sistema: OS X...
     pass
-elif platform == "win32":
+elif platform == 'win32':
     # Sistema: Windows...
     # Dimensión de la pantalla
     user32 = ctypes.windll.user32
